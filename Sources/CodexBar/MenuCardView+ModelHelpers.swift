@@ -66,12 +66,14 @@ extension UsageMenuCardView.Model {
             !self.usageNotes.isEmpty ||
             self.openAIAPIUsage != nil ||
             self.inlineUsageDashboard != nil ||
+            self.codexResetCreditsText != nil ||
             self.placeholder != nil
     }
 
     var usesStackedDetailLayout: Bool {
         !self.metrics.isEmpty ||
             self.creditsText != nil ||
+            self.codexResetCreditsText != nil ||
             self.providerCost != nil ||
             self.tokenUsage != nil
     }
