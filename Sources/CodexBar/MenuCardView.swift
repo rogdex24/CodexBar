@@ -560,34 +560,28 @@ struct UsageMenuCardUsageSectionView: View {
     var body: some View {
         let liveModel = self.liveModel
         VStack(alignment: .leading, spacing: 12) {
-            if liveModel.metrics.isEmpty {
-                if let dashboard = liveModel.inlineUsageDashboard {
-                    InlineUsageDashboardContent(model: dashboard)
-                } else if !liveModel.usageNotes.isEmpty {
-                    UsageNotesContent(notes: liveModel.usageNotes)
-                } else if let placeholder = liveModel.placeholder {
-                    Text(placeholder)
-                        .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
-                        .font(.subheadline)
-                }
-            } else {
-                ForEach(liveModel.metrics, id: \.id) { metric in
-                    MetricRow(
-                        metric: metric,
-                        title: UsageMenuCardView.popupMetricTitle(provider: liveModel.provider, metric: metric),
-                        progressColor: liveModel.progressColor)
-                }
-                if let resetCredits = liveModel.codexResetCreditsText {
+            ForEach(liveModel.metrics, id: \.id) { metric in
+                MetricRow(
+                    metric: metric,
+                    title: UsageMenuCardView.popupMetricTitle(provider: liveModel.provider, metric: metric),
+                    progressColor: liveModel.progressColor)
+            }
+            if let resetCredits = liveModel.codexResetCreditsText {
+                if !liveModel.metrics.isEmpty {
                     Divider()
-                    CodexResetCreditsContent(
-                        text: resetCredits,
-                        detailText: liveModel.codexResetCreditsDetailText)
                 }
-                if let dashboard = liveModel.inlineUsageDashboard {
-                    InlineUsageDashboardContent(model: dashboard)
-                } else if !liveModel.usageNotes.isEmpty {
-                    UsageNotesContent(notes: liveModel.usageNotes)
-                }
+                CodexResetCreditsContent(
+                    text: resetCredits,
+                    detailText: liveModel.codexResetCreditsDetailText)
+            }
+            if let dashboard = liveModel.inlineUsageDashboard {
+                InlineUsageDashboardContent(model: dashboard)
+            } else if !liveModel.usageNotes.isEmpty {
+                UsageNotesContent(notes: liveModel.usageNotes)
+            } else if let placeholder = liveModel.placeholder, liveModel.metrics.isEmpty, liveModel.codexResetCreditsText == nil {
+                Text(placeholder)
+                    .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
+                    .font(.subheadline)
             }
             if self.showBottomDivider {
                 Divider()
@@ -1042,9 +1036,9 @@ extension UsageMenuCardView.Model {
         }
         let count = resetCredits.availableCount
         if count == 1 {
-            return L("1 Available")
+            return L("1 manual reset available")
         }
-        return String(format: L("%d Available"), count)
+        return String(format: L("%d manual resets available"), count)
     }
 
     private static func codexResetCreditsDetailText(input: Input) -> String? {
