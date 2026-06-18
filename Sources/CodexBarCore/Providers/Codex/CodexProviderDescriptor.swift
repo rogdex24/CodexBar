@@ -178,9 +178,19 @@ struct CodexOAuthFetchStrategy: ProviderFetchStrategy {
             accessToken: credentials.accessToken,
             accountId: credentials.accountId,
             env: context.env)
+        let shouldFetchResetCredits = context.includeOptionalUsage || context.includeCredits
+        let resetCredits: CodexRateLimitResetCreditsSnapshot? = if shouldFetchResetCredits {
+            try? await CodexOAuthUsageFetcher.fetchRateLimitResetCredits(
+                accessToken: credentials.accessToken,
+                accountId: credentials.accountId,
+                env: context.env)
+        } else {
+            nil
+        }
         let updatedAt = Date()
         return try Self.makeResult(
             usageResponse: usage,
+            resetCredits: resetCredits,
             credentials: credentials,
             updatedAt: updatedAt,
             sourceMode: context.sourceMode)
@@ -224,6 +234,7 @@ struct CodexOAuthFetchStrategy: ProviderFetchStrategy {
 
     private static func makeResult(
         usageResponse: CodexUsageResponse,
+        resetCredits: CodexRateLimitResetCreditsSnapshot? = nil,
         credentials: CodexOAuthCredentials,
         updatedAt: Date,
         sourceMode: ProviderSourceMode) throws -> ProviderFetchResult
@@ -236,7 +247,7 @@ struct CodexOAuthFetchStrategy: ProviderFetchStrategy {
 
         if let reconciled {
             return CodexOAuthFetchStrategy().makeResult(
-                usage: reconciled.toUsageSnapshot(),
+                usage: reconciled.toUsageSnapshot().withCodexResetCredits(resetCredits),
                 credits: credits,
                 sourceLabel: "oauth")
         }
@@ -253,6 +264,7 @@ struct CodexOAuthFetchStrategy: ProviderFetchStrategy {
                 primary: nil,
                 secondary: nil,
                 tertiary: nil,
+                codexResetCredits: resetCredits,
                 updatedAt: updatedAt,
                 identity: CodexReconciledState.oauthIdentity(
                     response: usageResponse,

@@ -704,4 +704,65 @@ struct CodexOAuthTests {
         let url = CodexOAuthUsageFetcher._resolveUsageURLForTesting(configContents: config)
         #expect(url.absoluteString == "https://chat.openai.com/backend-api/wham/usage")
     }
+
+    @Test
+    func `resolves rate limit reset credits URL from chat GPT config`() {
+        let config = "chatgpt_base_url = \"https://chatgpt.com/backend-api/\"\n"
+        let url = CodexOAuthUsageFetcher._resolveRateLimitResetCreditsURLForTesting(configContents: config)
+        #expect(url.absoluteString == "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits")
+    }
+
+    @Test
+    func `decodes rate limit reset credits`() throws {
+        let json = """
+        {
+          "credits": [
+            {
+              "id": "RateLimitResetCredit_later",
+              "reset_type": "codex_rate_limits",
+              "status": "available",
+              "granted_at": "2026-06-18T00:39:53.731630Z",
+              "expires_at": "2026-07-18T00:39:53.731630Z",
+              "redeem_started_at": null,
+              "redeemed_at": null,
+              "profile_image_url": "https://example.com/codex.png",
+              "profile_user_id": "Codex Team",
+              "title": "One free rate limit reset",
+              "description": "Thanks for using Codex!"
+            },
+            {
+              "id": "RateLimitResetCredit_earlier",
+              "reset_type": "codex_rate_limits",
+              "status": "available",
+              "granted_at": "2026-06-12T04:03:43.263391Z",
+              "expires_at": "2026-07-12T04:03:43.263391Z",
+              "redeem_started_at": null,
+              "redeemed_at": null,
+              "title": "One free rate limit reset",
+              "description": "Thanks for using Codex!"
+            },
+            {
+              "id": "RateLimitResetCredit_future_status",
+              "reset_type": "codex_rate_limits",
+              "status": "future_status",
+              "granted_at": "2026-06-12T04:03:43Z",
+              "expires_at": "2026-07-10T04:03:43Z",
+              "redeem_started_at": null,
+              "redeemed_at": null,
+              "title": "One free rate limit reset",
+              "description": "Thanks for using Codex!"
+            }
+          ],
+          "available_count": 2
+        }
+        """
+
+        let snapshot = try CodexOAuthUsageFetcher._decodeRateLimitResetCreditsForTesting(Data(json.utf8))
+
+        #expect(snapshot.availableCount == 2)
+        #expect(snapshot.credits.count == 3)
+        #expect(snapshot.credits[0].resetType == "codex_rate_limits")
+        #expect(snapshot.credits[2].status == .unknown("future_status"))
+        #expect(snapshot.nextExpiringAvailableCredit?.id == "RateLimitResetCredit_earlier")
+    }
 }
