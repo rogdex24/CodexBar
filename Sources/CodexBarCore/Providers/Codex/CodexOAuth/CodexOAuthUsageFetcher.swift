@@ -278,12 +278,13 @@ public enum CodexOAuthUsageFetcher {
     public static func fetchRateLimitResetCredits(
         accessToken: String,
         accountId: String?,
-        env: [String: String] = ProcessInfo.processInfo.environment) async throws
+        env: [String: String] = ProcessInfo.processInfo.environment,
+        timeout: TimeInterval = 4,
+        session transport: any ProviderHTTPTransport = ProviderHTTPClient.shared) async throws
         -> CodexRateLimitResetCreditsSnapshot
     {
-        var request = URLRequest(url: Self.resolveRateLimitResetCreditsURL(env: env))
+        var request = URLRequest(url: Self.resolveRateLimitResetCreditsURL(env: env), timeoutInterval: timeout)
         request.httpMethod = "GET"
-        request.timeoutInterval = 30
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("CodexBar", forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -295,7 +296,7 @@ public enum CodexOAuthUsageFetcher {
         }
 
         do {
-            let response = try await ProviderHTTPClient.shared.response(for: request)
+            let response = try await transport.response(for: request)
             let data = response.data
 
             switch response.statusCode {
@@ -304,6 +305,9 @@ public enum CodexOAuthUsageFetcher {
                     let decoder = JSONDecoder()
                     decoder.dateDecodingStrategy = .custom(Self.decodeISO8601Date)
                     let payload = try decoder.decode(RateLimitResetCreditsResponse.self, from: data)
+                    guard payload.availableCount >= 0 else {
+                        throw CodexOAuthFetchError.invalidResponse
+                    }
                     return CodexRateLimitResetCreditsSnapshot(
                         credits: payload.credits,
                         availableCount: payload.availableCount,

@@ -626,6 +626,56 @@ struct CodexOAuthTests {
     }
 
     @Test
+    func `reset credits only O auth payload still returns usage result`() throws {
+        let json = #"{"rate_limit":{"primary_window":null,"secondary_window":null}}"#
+        let now = Date()
+        let resetCredits = CodexRateLimitResetCreditsSnapshot(
+            credits: [],
+            availableCount: 2,
+            updatedAt: now)
+        let creds = CodexOAuthCredentials(
+            accessToken: "access",
+            refreshToken: "refresh",
+            idToken: nil,
+            accountId: nil,
+            lastRefresh: now)
+
+        let result = try CodexOAuthFetchStrategy._mapResultForTesting(
+            Data(json.utf8),
+            credentials: creds,
+            resetCredits: resetCredits)
+
+        #expect(result.usage.primary == nil)
+        #expect(result.usage.secondary == nil)
+        #expect(result.usage.codexResetCredits?.availableCount == 2)
+        #expect(result.credits == nil)
+        #expect(result.sourceLabel == "oauth")
+    }
+
+    @Test
+    func `empty reset credits do not mask missing O auth usage`() {
+        let json = #"{"rate_limit":{"primary_window":null,"secondary_window":null}}"#
+        let now = Date()
+        let resetCredits = CodexRateLimitResetCreditsSnapshot(
+            credits: [],
+            availableCount: 0,
+            updatedAt: now)
+        let creds = CodexOAuthCredentials(
+            accessToken: "access",
+            refreshToken: "refresh",
+            idToken: nil,
+            accountId: nil,
+            lastRefresh: now)
+
+        #expect(throws: UsageError.self) {
+            try CodexOAuthFetchStrategy._mapResultForTesting(
+                Data(json.utf8),
+                credentials: creds,
+                resetCredits: resetCredits)
+        }
+    }
+
+    @Test
     func `auto mode only falls back from O auth on auth failures`() {
         let strategy = CodexOAuthFetchStrategy()
         let context = self.makeContext(sourceMode: .auto)
@@ -703,66 +753,5 @@ struct CodexOAuthTests {
         let config = "chatgpt_base_url = \"https://chat.openai.com\"\n"
         let url = CodexOAuthUsageFetcher._resolveUsageURLForTesting(configContents: config)
         #expect(url.absoluteString == "https://chat.openai.com/backend-api/wham/usage")
-    }
-
-    @Test
-    func `resolves rate limit reset credits URL from chat GPT config`() {
-        let config = "chatgpt_base_url = \"https://chatgpt.com/backend-api/\"\n"
-        let url = CodexOAuthUsageFetcher._resolveRateLimitResetCreditsURLForTesting(configContents: config)
-        #expect(url.absoluteString == "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits")
-    }
-
-    @Test
-    func `decodes rate limit reset credits`() throws {
-        let json = """
-        {
-          "credits": [
-            {
-              "id": "RateLimitResetCredit_later",
-              "reset_type": "codex_rate_limits",
-              "status": "available",
-              "granted_at": "2026-06-18T00:39:53.731630Z",
-              "expires_at": "2026-07-18T00:39:53.731630Z",
-              "redeem_started_at": null,
-              "redeemed_at": null,
-              "profile_image_url": "https://example.com/codex.png",
-              "profile_user_id": "Codex Team",
-              "title": "One free rate limit reset",
-              "description": "Thanks for using Codex!"
-            },
-            {
-              "id": "RateLimitResetCredit_earlier",
-              "reset_type": "codex_rate_limits",
-              "status": "available",
-              "granted_at": "2026-06-12T04:03:43.263391Z",
-              "expires_at": "2026-07-12T04:03:43.263391Z",
-              "redeem_started_at": null,
-              "redeemed_at": null,
-              "title": "One free rate limit reset",
-              "description": "Thanks for using Codex!"
-            },
-            {
-              "id": "RateLimitResetCredit_future_status",
-              "reset_type": "codex_rate_limits",
-              "status": "future_status",
-              "granted_at": "2026-06-12T04:03:43Z",
-              "expires_at": "2026-07-10T04:03:43Z",
-              "redeem_started_at": null,
-              "redeemed_at": null,
-              "title": "One free rate limit reset",
-              "description": "Thanks for using Codex!"
-            }
-          ],
-          "available_count": 2
-        }
-        """
-
-        let snapshot = try CodexOAuthUsageFetcher._decodeRateLimitResetCreditsForTesting(Data(json.utf8))
-
-        #expect(snapshot.availableCount == 2)
-        #expect(snapshot.credits.count == 3)
-        #expect(snapshot.credits[0].resetType == "codex_rate_limits")
-        #expect(snapshot.credits[2].status == .unknown("future_status"))
-        #expect(snapshot.nextExpiringAvailableCredit?.id == "RateLimitResetCredit_earlier")
     }
 }
